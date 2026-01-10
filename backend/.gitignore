@@ -1,0 +1,30 @@
+# IDE Settings
+.idea/
+.vscode/
+.settings/
+.classpath
+.project
+*.iml
+*.iws
+*.ipr
+
+# Java / Spring Boot
+backend/target/
+backend/build/
+*.jar
+*.war
+*.log
+
+# Node / React
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+npm-debug.log*
+
+# Docker & Environment
+.env
+.docker-cache/
+
+# OS Specific
+.DS_Store
+Thumbs.db

@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # 1. Database Service (MySQL)
+  db:
+    image: mysql:8.0
+    container_name: mysql_gateway
+    restart: always
+    environment:
+      MYSQL_DATABASE: payment_gateway
+      MYSQL_USER: gateway_user
+      MYSQL_PASSWORD: gateway_pass
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # 2. Backend Service (Spring Boot)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gateway_backend
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      # These variables override your application.properties
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/payment_gateway?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_USERNAME: gateway_user
+      SPRING_DATASOURCE_PASSWORD: gateway_pass
+      # Merchant Test Credentials for seeding logic
+      TEST_MERCHANT_ID: 550e8400-e29b-41d4-a716-446655440000
+      TEST_API_KEY: key_test_abc123
+      TEST_API_SECRET: secret_test_xyz789
+
+  # 3. Dashboard (Frontend)
+  dashboard:
+    build:
+      context: ./frontend
+    container_name: gateway_dashboard
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  # 4. Checkout Page
+  checkout:
+    build:
+      context: ./checkout-page
+    container_name: gateway_checkout
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
