@@ -7,10 +7,11 @@ services:
     container_name: mysql_gateway
     restart: always
     environment:
-      MYSQL_DATABASE: payment_gateway
-      MYSQL_USER: gateway_user
-      MYSQL_PASSWORD: gateway_pass
-      MYSQL_ROOT_PASSWORD: root_password
+      # Pulled from .env variables
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
@@ -32,14 +33,15 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # These variables override your application.properties
-      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/payment_gateway?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
-      SPRING_DATASOURCE_USERNAME: gateway_user
-      SPRING_DATASOURCE_PASSWORD: gateway_pass
-      # Merchant Test Credentials for seeding logic
-      TEST_MERCHANT_ID: 550e8400-e29b-41d4-a716-446655440000
-      TEST_API_KEY: key_test_abc123
-      TEST_API_SECRET: secret_test_xyz789
+      # Backend environment variables
+      SPRING_DATASOURCE_URL: ${DATABASE_URL}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      TEST_MERCHANT_ID: ${TEST_MERCHANT_ID}
+      TEST_API_KEY: ${TEST_API_KEY}
+      TEST_API_SECRET: ${TEST_API_SECRET}
+      TEST_MODE: ${TEST_MODE}
+      TEST_PROCESSING_DELAY: ${TEST_PROCESSING_DELAY}
 
   # 3. Dashboard (Frontend)
   dashboard:
