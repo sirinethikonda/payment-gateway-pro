@@ -49,3 +49,54 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE INDEX idx_orders_merchant_id ON orders(merchant_id);
 CREATE INDEX idx_payments_order_id ON payments(order_id);
 CREATE INDEX idx_payments_status ON payments(status);
+
+-- 4. Refunds Table
+CREATE TABLE IF NOT EXISTS refunds (
+    id VARCHAR(64) PRIMARY KEY,
+    payment_id VARCHAR(64) NOT NULL,
+    merchant_id VARCHAR(36) NOT NULL,
+    amount INT NOT NULL,
+    reason TEXT,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP,
+    FOREIGN KEY (payment_id) REFERENCES payments(id),
+    FOREIGN KEY (merchant_id) REFERENCES merchants(id)
+);
+
+-- 5. Webhook Logs Table
+CREATE TABLE IF NOT EXISTS webhook_logs (
+    id VARCHAR(36) PRIMARY KEY,
+    merchant_id VARCHAR(36) NOT NULL,
+    event VARCHAR(50) NOT NULL,
+    payload JSON NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    attempts INT DEFAULT 0,
+    last_attempt_at TIMESTAMP,
+    next_retry_at TIMESTAMP,
+    response_code INT,
+    response_body TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (merchant_id) REFERENCES merchants(id)
+);
+
+-- 6. Idempotency Keys Table
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    key_value VARCHAR(255),
+    merchant_id VARCHAR(36) NOT NULL,
+    response JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    PRIMARY KEY (key_value, merchant_id),
+    FOREIGN KEY (merchant_id) REFERENCES merchants(id)
+);
+
+-- Schema Modifications (Will fail safely if columns exist due to continue-on-error=true)
+ALTER TABLE merchants ADD COLUMN webhook_secret VARCHAR(64);
+ALTER TABLE payments ADD COLUMN captured BOOLEAN DEFAULT FALSE;
+
+-- New Indexes
+CREATE INDEX idx_refunds_payment_id ON refunds(payment_id);
+CREATE INDEX idx_webhook_logs_merchant_id ON webhook_logs(merchant_id);
+CREATE INDEX idx_webhook_logs_status ON webhook_logs(status);
+CREATE INDEX idx_webhook_logs_next_retry ON webhook_logs(next_retry_at);

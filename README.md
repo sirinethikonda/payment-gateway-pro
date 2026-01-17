@@ -4,6 +4,7 @@ A comprehensive Payment Gateway solution featuring a Spring Boot backend, a Merc
 
 ##  Table of Contents
 
+- [Deliverable 2: Production-Ready Features](deliverable-2-production-ready-features)
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)

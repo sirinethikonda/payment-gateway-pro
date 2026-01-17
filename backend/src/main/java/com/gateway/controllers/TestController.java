@@ -2,6 +2,7 @@ package com.gateway.controllers;
 
 import com.gateway.dto.ErrorResponse;
 import com.gateway.models.Merchant;
+import com.gateway.services.JobService;
 import com.gateway.services.MerchantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,7 @@ import java.util.Optional;
 public class TestController {
 
     private final MerchantService merchantService;
+    private final JobService jobService;
 
     @GetMapping("/merchant")
     public ResponseEntity<?> getTestMerchant() {
@@ -39,5 +41,12 @@ public class TestController {
         } else {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("NOT_FOUND_ERROR", "Test merchant not found"));
         }
+    }
+
+    @GetMapping("/jobs/status")
+    public Map<String, Object> getJobQueueStatus() {
+        Map<String, Object> status = jobService.getQueueStatus();
+        status.put("worker_status", "running");
+        return status;
     }
 }

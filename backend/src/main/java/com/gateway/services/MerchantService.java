@@ -52,4 +52,13 @@ public class MerchantService {
     public Optional<Merchant> getMerchantByApiKey(String apiKey) {
         return merchantRepository.findByApiKey(apiKey);
     }
+
+    public Merchant updateWebhookConfig(java.util.UUID merchantId, String url, String secret) {
+        Merchant merchant = merchantRepository.findById(merchantId).orElseThrow(() -> new RuntimeException("Merchant not found"));
+        merchant.setWebhookUrl(url);
+        if (secret != null && !secret.isEmpty()) {
+            merchant.setWebhookSecret(secret);
+        }
+        return merchantRepository.save(merchant);
+    }
 }

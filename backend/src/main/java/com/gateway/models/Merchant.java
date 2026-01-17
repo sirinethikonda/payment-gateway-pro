@@ -37,6 +37,9 @@ public class Merchant {
     @Column(name = "webhook_url", columnDefinition = "TEXT")
     private String webhookUrl;
 
+    @Column(name = "webhook_secret", length = 64)
+    private String webhookSecret;
+
     @Column(name = "is_active")
     private boolean isActive = true;
 

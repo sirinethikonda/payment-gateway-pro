@@ -14,6 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Random;
 
+import com.gateway.repositories.IdempotencyKeyRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -22,23 +26,24 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final ValidationService validationService;
 
-    @Value("${TEST_MODE:false}")
-    private boolean testMode;
-
-    @Value("${TEST_PAYMENT_SUCCESS:true}")
-    private boolean testPaymentSuccess;
-
-    @Value("${TEST_PROCESSING_DELAY:1000}")
-    private int testProcessingDelay;
-
-    @Value("${UPI_SUCCESS_RATE:0.90}")
-    private double upiSuccessRate;
-
-    @Value("${CARD_SUCCESS_RATE:0.95}")
-    private double cardSuccessRate;
-
     @Transactional
     public Payment initPayment(Order order, CreatePaymentRequest request) {
+        // Renamed to createPayment and modified below, but initPayment signature was different.
+        // We replaced processPaymentAsync with createPayment logic.
+        // We must also remove initPayment or update it.
+        // The previous step replaced processPaymentAsync but left initPayment.
+        // We should consolidate.
+        // I will remove initPayment in a separate call or here.
+        // Let's remove initPayment here and the old fields.
+        return createPayment(order, request, null);
+    }
+
+
+    private final IdempotencyKeyRepository idempotencyKeyRepository;
+    private final JobService jobService;
+
+    @Transactional
+    public Payment createPayment(Order order, CreatePaymentRequest request, String idempotencyKey) {
         Payment payment = new Payment();
         payment.setId(generatePaymentId());
         payment.setOrderId(order.getId());
@@ -46,7 +51,7 @@ public class PaymentService {
         payment.setAmount(order.getAmount());
         payment.setCurrency(order.getCurrency());
         payment.setMethod(request.getMethod());
-        payment.setStatus("processing"); // Always start as processing
+        payment.setStatus("pending"); // Async processing start
 
         if ("upi".equalsIgnoreCase(request.getMethod())) {
             payment.setVpa(request.getVpa());
@@ -59,51 +64,38 @@ public class PaymentService {
             }
         }
 
+        Payment savedPayment = paymentRepository.save(payment);
+        
+        // Enqueue Job
+        jobService.enqueuePaymentJob(new com.gateway.jobs.ProcessPaymentJob(savedPayment.getId(), idempotencyKey));
+        
+        return savedPayment;
+    }
+
+    @Transactional
+    public Payment capturePayment(String paymentId, java.util.UUID merchantId) {
+        Payment payment = paymentRepository.findById(paymentId)
+            .filter(p -> p.getMerchantId().equals(merchantId))
+            .orElse(null);
+            
+        if (payment == null) {
+            throw new IllegalArgumentException("Payment not found");
+        }
+        
+        if (!"success".equalsIgnoreCase(payment.getStatus())) {
+             throw new IllegalStateException("Payment not in capturable state");
+        }
+        
+        if (Boolean.TRUE.equals(payment.getCaptured())) {
+            // Already captured, return as is or error? Usually idempotent success.
+            return payment;
+        }
+
+        payment.setCaptured(true);
+        payment.setUpdatedAt(java.time.LocalDateTime.now());
         return paymentRepository.save(payment);
     }
 
-    @Async
-    public void processPaymentAsync(Payment payment) {
-        try {
-            // Delay
-            long delay;
-            if (testMode) {
-                delay = testProcessingDelay;
-            } else {
-                // 5-10 seconds
-                delay = 5000 + new Random().nextInt(5001);
-            }
-            Thread.sleep(delay);
-
-            // Determine Success
-            boolean success;
-            if (testMode) {
-                success = testPaymentSuccess;
-            } else {
-                double rand = Math.random();
-                if ("upi".equalsIgnoreCase(payment.getMethod())) {
-                    success = rand < upiSuccessRate;
-                } else {
-                    success = rand < cardSuccessRate;
-                }
-            }
-
-            if (success) {
-                payment.setStatus("success");
-            } else {
-                payment.setStatus("failed");
-                payment.setErrorCode("PAYMENT_FAILED");
-                payment.setErrorDescription("Payment processing failed randomly.");
-            }
-            
-            paymentRepository.save(payment);
-            log.info("Processed Payment {}: {}", payment.getId(), payment.getStatus());
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.error("Payment processing interrupted", e);
-        }
-    }
 
     public Payment getPayment(String id) {
         return paymentRepository.findById(id).orElse(null);

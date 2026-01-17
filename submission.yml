@@ -1,0 +1,16 @@
+version: 1.0
+setup:
+  - echo "Setting up environment..."
+  - cp .env.example .env || true
+  - cd backend && mvn clean package -DskipTests
+  - cd ../checkout-widget && npm install && npm run build
+  - cd .. && powershell -Command "Copy-Item -Path 'checkout-widget/dist/checkout.js' -Destination 'checkout-page/public/checkout.js'"
+start:
+  - docker-compose up -d --build
+test:
+  - cd backend && mvn test
+verify:
+  - curl http://localhost:8000/api/v1/health
+  - curl http://localhost:8000/api/v1/test/jobs/status
+shutdown:
+  - docker-compose down

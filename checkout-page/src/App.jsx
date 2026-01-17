@@ -9,10 +9,12 @@ function App() {
     <Router>
       <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
         <Routes>
+          <Route path="/" element={<Checkout />} />
+          <Route path="/index.html" element={<Checkout />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/success" element={<Success />} />
           <Route path="/failure" element={<Failure />} />
-          <Route path="*" element={<div className="p-10 text-center">Page Not Found</div>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </Router>

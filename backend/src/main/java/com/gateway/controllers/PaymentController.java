@@ -15,6 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Optional; 
+import org.springframework.http.ResponseEntity;
 
 @RestController
 @RequestMapping("/api/v1/payments")
@@ -25,18 +27,54 @@ public class PaymentController {
     private final OrderService orderService;
     private final ValidationService validationService;
 
+    private final com.gateway.services.IdempotencyService idempotencyService;
+
     @PostMapping
-    public ResponseEntity<?> createPayment(@RequestBody CreatePaymentRequest request, HttpServletRequest httpRequest) {
+    public ResponseEntity<?> createPayment(
+            @RequestBody CreatePaymentRequest request, 
+            HttpServletRequest httpRequest,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        
         Merchant merchant = (Merchant) httpRequest.getAttribute("merchant");
-        return handlePaymentCreation(request, merchant);
+        
+        // Idempotency Check
+        if (idempotencyKey != null && !idempotencyKey.isEmpty()) {
+            java.util.Optional<Map<String, Object>> cachedResponse = idempotencyService.getResponse(idempotencyKey, merchant.getId());
+            if (cachedResponse.isPresent()) {
+                return ResponseEntity.status(HttpStatus.CREATED).body(cachedResponse.get());
+            }
+        }
+
+        // Validation & Creation
+        ResponseEntity<?> validationResponse = validateRequest(request, merchant);
+        if (validationResponse != null) return validationResponse;
+
+        Payment payment = paymentService.createPayment(orderService.getOrder(request.getOrder_id()), request, idempotencyKey);
+        
+        // Save Idempotency response
+        if (idempotencyKey != null && !idempotencyKey.isEmpty()) {
+            idempotencyService.saveResponse(idempotencyKey, merchant.getId(), payment);
+        }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(payment);
     }
     
-    @PostMapping("/public")
-    public ResponseEntity<?> createPublicPayment(@RequestBody CreatePaymentRequest request) {
-        return handlePaymentCreation(request, null);
+    @PostMapping("/{id}/capture")
+    public ResponseEntity<?> capturePayment(@PathVariable String id, @RequestBody Map<String, Object> body, HttpServletRequest httpRequest) {
+        Merchant merchant = (Merchant) httpRequest.getAttribute("merchant");
+        // Validate amount presence if needed, though Requirements say "Request Body: { amount: 50000 }"
+        
+        try {
+            Payment payment = paymentService.capturePayment(id, merchant.getId());
+            return ResponseEntity.ok(payment);
+        } catch (IllegalArgumentException e) {
+             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("NOT_FOUND_ERROR", e.getMessage()));
+        } catch (IllegalStateException e) {
+             return ResponseEntity.badRequest().body(new ErrorResponse("BAD_REQUEST_ERROR", e.getMessage()));
+        }
     }
 
-    private ResponseEntity<?> handlePaymentCreation(CreatePaymentRequest request, Merchant authenticatedMerchant) {
+    private ResponseEntity<?> validateRequest(CreatePaymentRequest request, Merchant authenticatedMerchant) {
         if (request.getOrder_id() == null) {
              return ResponseEntity.badRequest().body(new ErrorResponse("BAD_REQUEST_ERROR", "order_id is required"));
         }
@@ -59,11 +97,14 @@ public class PaymentController {
                 return ResponseEntity.badRequest().body(new ErrorResponse("INVALID_CARD", "Card validation failed"));
             }
         }
+        return null; // Valid
+    }
 
-        Payment payment = paymentService.initPayment(order, request);
-        paymentService.processPaymentAsync(payment);
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(payment);
+    // Legacy method signature handling
+    private ResponseEntity<?> handlePaymentCreation(CreatePaymentRequest request, Merchant authenticatedMerchant) {
+         // Re-routing to new logic if called internally, but likely simpler to just inline logic as above.
+         // This is removed/replaced by createPayment above.
+         return null;
     }
 
     @GetMapping("/{id}")

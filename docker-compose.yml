@@ -1,13 +1,11 @@
 version: '3.8'
 
 services:
-  # 1. Database Service (MySQL)
   db:
     image: mysql:8.0
     container_name: mysql_gateway
     restart: always
     environment:
-      # Pulled from .env variables
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
@@ -21,19 +19,19 @@ services:
       timeout: 20s
       retries: 10
 
-  # 2. Backend Service (Spring Boot)
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .                   # Crucial: Use root directory as context
+      dockerfile: backend/Dockerfile # Path to Dockerfile relative to root
     container_name: gateway_backend
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
-      # Backend environment variables
       SPRING_DATASOURCE_URL: ${DATABASE_URL}
       SPRING_DATASOURCE_USERNAME: ${DB_USER}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
@@ -42,8 +40,10 @@ services:
       TEST_API_SECRET: ${TEST_API_SECRET}
       TEST_MODE: ${TEST_MODE}
       TEST_PROCESSING_DELAY: ${TEST_PROCESSING_DELAY}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_PROFILES_ACTIVE: api
 
-  # 3. Dashboard (Frontend)
   dashboard:
     build:
       context: ./frontend
@@ -53,7 +53,6 @@ services:
     depends_on:
       - backend
 
-  # 4. Checkout Page
   checkout:
     build:
       context: ./checkout-page
@@ -62,6 +61,37 @@ services:
       - "3001:80"
     depends_on:
       - backend
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_gateway
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  worker:
+    build:
+      context: .                   # Crucial: Use root directory as context
+      dockerfile: backend/Dockerfile.worker
+    container_name: gateway_worker
+    environment:
+      SPRING_DATASOURCE_URL: ${DATABASE_URL}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_PROFILES_ACTIVE: worker
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
 
 volumes:
   mysql_data:

@@ -59,6 +59,9 @@ public class Payment {
     @Column(name = "error_description", columnDefinition = "TEXT")
     private String errorDescription;
 
+    @Column(columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean captured = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
