@@ -27,7 +27,18 @@ public class AuthenticationFilter extends HttpFilter {
         String path = request.getRequestURI();
         
         // Allowed paths
-        if (path.equals("/health") || path.startsWith("/api/v1/test/") || path.startsWith("/api/v1/payments/public")|| path.startsWith("/api/v1/orders/public")) { // Assuming public order fetching for checkout
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            response.setStatus(HttpServletResponse.SC_OK);
+            chain.doFilter(request, response);
+            return;
+        }
+
+        // Allowed paths
+        if (path.equals("/health") || 
+            path.startsWith("/api/v1/test/") || 
+            path.startsWith("/api/v1/payments/public") || 
+            path.startsWith("/api/v1/orders/public") ||
+            (path.equals("/api/v1/payments") && "POST".equalsIgnoreCase(request.getMethod()))) { 
             chain.doFilter(request, response);
             return;
         }

@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { login } from '../services/api';
 
 const Login = () => {
-    const [email, setEmail] = useState('demo@example.com');
-    const [password, setPassword] = useState('password');
+    const [email, setEmail] = useState();
+    const [password, setPassword] = useState();
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -15,7 +15,7 @@ const Login = () => {
             // API now expects email/password
             await login(email, password);
             window.location.href = '/dashboard';
-        } catch (err) {
+        } catch {
             setError('Invalid credentials. Please try again.');
         } finally {
             setIsLoading(false);
@@ -31,13 +31,13 @@ const Login = () => {
                         <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/50">
                             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
                         </div>
-                        <span className="text-2xl font-bold tracking-tight">NovaPay</span>
+                        <span className="text-2xl font-bold tracking-tight">Payment Gateway</span>
                     </div>
                     <h1 className="text-5xl font-extrabold leading-tight mb-6">
                         The future of <br /> digital payments.
                     </h1>
                     <p className="text-slate-300 text-lg max-w-md leading-relaxed">
-                        Seamlessly manage transactions, refunds, and webhooks from a single, beautiful dashboard.
+                        Seamlessly manage transactions, refunds, and webhooks from a single.
                     </p>
                 </div>
 
@@ -46,7 +46,7 @@ const Login = () => {
                 <div className="absolute bottom-0 left-0 -ml-32 -mb-32 w-[30rem] h-[30rem] bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse animation-delay-2000"></div>
 
                 <div className="relative z-10 text-slate-400 text-sm font-medium">
-                    &copy; 2026 NovaPay Inc. All rights reserved.
+                    &copy;
                 </div>
             </div>
 

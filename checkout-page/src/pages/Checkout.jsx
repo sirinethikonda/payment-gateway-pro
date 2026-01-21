@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 
 const Checkout = () => {
-    const [searchParams] = new URLSearchParams(window.location.search);
-    const orderId = searchParams.get('order_id') || 'ORDER_12345';
+    const searchParams = new URLSearchParams(window.location.search);
+    const orderId = searchParams.get('order_id') || searchParams.get('orderId') || 'ORDER_12345';
     // For demo, amount is fixed or could be fetched. Let's assume 500.00
     const amount = 50000; // in paise
 
@@ -106,7 +106,7 @@ const Checkout = () => {
                             <span className="font-medium text-gray-900 uppercase">{method}</span>
                         </div>
                         <button
-                            onClick={() => isEmbedded ? window.parent.postMessage({ type: 'close_modal' }, '*') : window.location.reload()}
+                            onClick={() => isEmbedded ? window.parent.postMessage({ type: 'close_modal' }, '*') : window.location.href = 'http://localhost:3000/dashboard'}
                             className="w-full mt-6 bg-slate-900 text-white py-3 rounded-xl font-medium hover:bg-black transition-colors shadow-lg shadow-slate-900/20"
                         >
                             Done

@@ -35,25 +35,43 @@ public class PaymentController {
             HttpServletRequest httpRequest,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
         
-        Merchant merchant = (Merchant) httpRequest.getAttribute("merchant");
+        // 1. Validation Logic moved up to ensure we have a valid Order and Merchant context
+        if (request.getOrder_id() == null) {
+             return ResponseEntity.badRequest().body(new ErrorResponse("BAD_REQUEST_ERROR", "order_id is required"));
+        }
         
-        // Idempotency Check
+        Order order = orderService.getOrder(request.getOrder_id());
+        if (order == null) {
+             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("NOT_FOUND_ERROR", "Order not found"));
+        }
+
+        Merchant authenticatedMerchant = (Merchant) httpRequest.getAttribute("merchant");
+        
+        // Validate ownership if authenticated
+        if (authenticatedMerchant != null && !order.getMerchantId().equals(authenticatedMerchant.getId())) {
+             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("NOT_FOUND_ERROR", "Order not found"));
+        }
+
+        java.util.UUID merchantId = (authenticatedMerchant != null) ? authenticatedMerchant.getId() : order.getMerchantId();
+
+        // 2. Idempotency Check
         if (idempotencyKey != null && !idempotencyKey.isEmpty()) {
-            java.util.Optional<Map<String, Object>> cachedResponse = idempotencyService.getResponse(idempotencyKey, merchant.getId());
+            java.util.Optional<Map<String, Object>> cachedResponse = idempotencyService.getResponse(idempotencyKey, merchantId);
             if (cachedResponse.isPresent()) {
                 return ResponseEntity.status(HttpStatus.CREATED).body(cachedResponse.get());
             }
         }
 
-        // Validation & Creation
-        ResponseEntity<?> validationResponse = validateRequest(request, merchant);
+        // 3. Additional Validation (Method specific)
+        ResponseEntity<?> validationResponse = validatePaymentDetails(request);
         if (validationResponse != null) return validationResponse;
 
-        Payment payment = paymentService.createPayment(orderService.getOrder(request.getOrder_id()), request, idempotencyKey);
+        // 4. Create Payment
+        Payment payment = paymentService.createPayment(order, request, idempotencyKey);
         
-        // Save Idempotency response
+        // 5. Save Idempotency response
         if (idempotencyKey != null && !idempotencyKey.isEmpty()) {
-            idempotencyService.saveResponse(idempotencyKey, merchant.getId(), payment);
+            idempotencyService.saveResponse(idempotencyKey, merchantId, payment);
         }
 
         return ResponseEntity.status(HttpStatus.CREATED).body(payment);
@@ -74,19 +92,8 @@ public class PaymentController {
         }
     }
 
-    private ResponseEntity<?> validateRequest(CreatePaymentRequest request, Merchant authenticatedMerchant) {
-        if (request.getOrder_id() == null) {
-             return ResponseEntity.badRequest().body(new ErrorResponse("BAD_REQUEST_ERROR", "order_id is required"));
-        }
-        
-        Order order = orderService.getOrder(request.getOrder_id());
-        if (order == null) {
-             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("NOT_FOUND_ERROR", "Order not found"));
-        }
-
-        if (authenticatedMerchant != null && !order.getMerchantId().equals(authenticatedMerchant.getId())) {
-             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("NOT_FOUND_ERROR", "Order not found"));
-        }
+    private ResponseEntity<?> validatePaymentDetails(CreatePaymentRequest request) {
+        // Order existence and Merchant ownership are already validated in createPayment
 
         if ("upi".equalsIgnoreCase(request.getMethod())) {
             if (!validationService.validateVPA(request.getVpa())) {
